@@ -85,21 +85,19 @@ class LaravelLocalization
 		$locale = Request::segment(1);
 		if(in_array($locale, $languages)){
 			$this->currentLanguage = $locale;
-			App::setLocale($locale);
-			Session::put('language', $locale);
-			$this->configRepository->set('application.language',  $locale);
 		}
 		else
 		{
 			$locale = null;
 			$this->currentLanguage = $this->getCurrentLanguage();
-			App::setLocale($this->currentLanguage);
-			$this->configRepository->set('application.language',  $this->currentLanguage);
-			if($this->configRepository->get('laravel-localization::useSessionLanguage'))
-			{
-				Session::put('language', $this->currentLanguage);
-			}
 		}
+		App::setLocale($this->currentLanguage);
+		$this->configRepository->set('application.language',  $this->currentLanguage);
+		if($this->configRepository->get('laravel-localization::useSessionLanguage'))
+		{
+			Session::put('language', $this->currentLanguage);
+		}
+
 		return $locale;
 	}
 
@@ -387,7 +385,11 @@ class LaravelLocalization
 	public function getRouteNameFromAPath($path)
 	{
 		$path = str_replace(url(), "", $path);
-	    $path = str_replace("/".$this->currentLanguage."/","",$path);
+		if($path[0] !== '/')
+		{
+			$path = '/' . $path;
+		}
+		$path = str_replace('/' . $this->currentLanguage . '/', '', $path);
 	    $path = trim($path,"/");
 
 	    foreach ($this->translatedRoutes as $route) {
