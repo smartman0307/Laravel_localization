@@ -5,6 +5,7 @@ use Illuminate\View\Environment;
 use Illuminate\Translation\Translator;
 use Request;
 use Session;
+use Cookie;
 use App;
 use View;
 use Config;
@@ -23,14 +24,14 @@ class LaravelLocalization
 	/**
      * Illuminate view environment.
      *
-     * @var \Illuminate\View\Environment
+     * @var Illuminate\View\Environment
      */
     protected $view;
 
 	/**
      * Illuminate translator class.
      *
-     * @var \Illuminate\Translation\Translator
+     * @var Illuminate\Translation\Translator
      */
     protected $translator;
 
@@ -50,14 +51,12 @@ class LaravelLocalization
 
     /**
      * An array that contains all routes that should be translated
-     *
      * @var array
      */
     protected $translatedRoutes = array();
 
     /**
      * Name of the translation key of the current route, it is used for url translations
-     *
      * @var string
      */
     protected $routeName = false;
@@ -66,8 +65,6 @@ class LaravelLocalization
      * Creates new instance.
      *
      * @param \Illuminate\Config\Repository $configRepository
-     * @param \Illuminate\View\Environment $view
-     * @param \Illuminate\Translation\Translator $translator
      */
     public function __construct(Repository $configRepository, Environment $view, Translator $translator)
     {
@@ -81,10 +78,8 @@ class LaravelLocalization
 
 	/**
 	 * Set and return current language
-     *
 	 * @param  string $locale	Language to set the App to (optional)
-     *
-	 * @return string 			Returns language (if route has any) or null (if route has not a language)
+	 * @return String 			Returns language (if route has any) or null (if route has not a language)
 	 */
 	public function setLanguage($locale = null)
 	{
@@ -115,17 +110,23 @@ class LaravelLocalization
 		{
 			Session::put('language', $this->currentLanguage);
 		}
-
+        if($this->configRepository->get('laravel-localization::useCookieLanguage'))
+        {
+            Cookie::queue(Cookie::forever('language', $this->currentLanguage));
+        }
+        //Forget the language cookie if it's disabled and exists
+        else if (Cookie::get('language') != null)
+        {
+            Cookie::forget('language');
+        }
 		return $locale;
 	}
 
 	/**
 	 * Returns html with language selector
-     *
 	 * @param  boolean $abbr 		Should languages be abbreviate (2 characters) or full named?
 	 * @param  string $customView 	Which template should the language bar have?
-     *
-	 * @return string 				Returns an html view with a language bar
+	 * @return String 				Returns an html view with a language bar
 	 */
 	public function getLanguageBar($abbr = false, $customView = 'mcamara/laravel-localization/languagebar')
 	{
@@ -172,19 +173,17 @@ class LaravelLocalization
 
     /**
      * Returns an URL adapted to $language language
-     *
-     * @param  string $language Language to adapt
-     * @param  string $route    URL to adapt, if false, current url would be taken
-     *
-     * @return string           URL translated
+     * @param  String $language Language to adapt
+     * @param  String $route    URL to adapt, if false, current url would be taken
+     * @return String           URL translated
      */
-    public function getURLLanguage($language, $route = null)
+    public function getURLLanguage($language,$route = false)
     {
         if(!in_array($language, $this->configRepository->get('laravel-localization::languagesAllowed')))
         {
 			return false;
         }
-        if(!isset($route))
+        if(!$route)
         {
         	if($this->routeName)
         	{
@@ -201,14 +200,12 @@ class LaravelLocalization
 
 	/**
 	 * Returns an URL adapted to the route name and the language given
-     *
-	 * @param  string $language 		Language to adapt
-	 * @param  string $transKeyName  	Translation key name of the url to adapt
-	 * @param  array $attributes  		Attributes for the route (only needed if transKeyName needs them)
-     *
+	 * @param  String $language 		Language to adapt
+	 * @param  String $transKeyName  	Translation key name of the url to adapt
+	 * @param  Array $array  			Attributes for the route (only needed if transKeyName need them)
 	 * @return string 	             	URL translated
 	 */
-	public function getURLFromRouteNameTranslated($language, $transKeyName = null, $attributes = array())
+	public function getURLFromRouteNameTranslated($language, $transKeyName = false, $attributes = array())
 	{
 		if(!in_array($language, $this->configRepository->get('laravel-localization::languagesAllowed')))
 		{
@@ -216,7 +213,7 @@ class LaravelLocalization
 			return false;
 		}
 
-		if(!isset($transKeyName))
+		if(!$transKeyName)
 		{
 			// if translation key name is not given
 			// the system would try to get the current one...
@@ -252,15 +249,15 @@ class LaravelLocalization
 			$route = url($language."/".$translation);
 			if(is_array($attributes))
 			{
-				foreach ($attributes as $key => $value) 
+				foreach ($attributes as $key => $value)
 				{
 					$route = str_replace("{".$key."}", $value, $route);
 					$route = str_replace("{".$key."?}", $value, $route);
 				}
 			}
 			// delete empty optional arguments
-			$route = preg_replace('/\/{[^)]+\?}/','',$route);
-			return rtrim($route, '/');
+			$route = preg_replace("/\/{[^)]+\?}/","",$route);
+			return rtrim($route, "/");
 		}
 		// This language does not have any key for this route name
 		return false;
@@ -269,28 +266,21 @@ class LaravelLocalization
 
 	/**
 	 * It returns an URL without language (if it has it)
-     *
-	 * @param  string $route URL to clean, if false, current url would be taken
-     *
-	 * @return string        Route with no language path
+	 * @param  String $route URL to clean, if false, current url would be taken
+	 * @return String        Clean URL
 	 */
-	public function getCleanRoute($route = null)
+	public function getCleanRoute($route = false)
 	{
-        if (empty($route)) {
-            $route = Request::url();
-        }
-        $parsed_route = parse_url($route);
-        $new_path = preg_replace('%^/?'.$this->currentLanguage.'(/?)%', '$1', $parsed_route['path']);
-
-        return str_replace($parsed_route['path'], $new_path, $route);
-    }
+		$cleanRoute = "";
+		if(!$route) $route = Request::url();
+		if(substr($route, -1) !== "/") $route .= "/";
+		$cleanRoute = str_replace("/".$this->currentLanguage."/","/",$route);
+		return rtrim($cleanRoute, "/");
+	}
 
 	/**
 	 * Appends i18n language segment to the URI
-     *
 	 * @param  string $uri
-     * @param  boolean $append_default  If true, append the default language to the path
-     *
 	 * @return string
 	 */
 	public function getURI($uri, $append_default = false)
@@ -305,7 +295,6 @@ class LaravelLocalization
 
 	/**
 	 * Returns default language
-     *
 	 * @return string
 	 */
 	public function getDefault()
@@ -315,9 +304,7 @@ class LaravelLocalization
 
 	/**
 	 * Returns all allowed languages
-     *
-	 * @param  boolean $abbr should the languages be abbreviated?
-     *
+	 * @param  Boolean $abbr should the languages be abbreviated?
 	 * @return array Array with all allowed languages
 	 */
 	public function getAllowedLanguages($abbr = true)
@@ -336,7 +323,6 @@ class LaravelLocalization
 
 	/**
 	 * Returns the class name of the language bar
-     *
 	 * @return string Language bar class name
 	 */
 	public function getLanguageBarClassName()
@@ -346,7 +332,6 @@ class LaravelLocalization
 
 	/**
 	 * Returns if the current language should be printed in the language bar
-     *
 	 * @return boolean Should the current language be printed?
 	 */
 	public function getPrintCurrentLanguage()
@@ -356,7 +341,6 @@ class LaravelLocalization
 
 	/**
 	 * Returns current language
-     *
 	 * @return string current language
 	 */
 	public function getCurrentLanguage()
@@ -371,23 +355,25 @@ class LaravelLocalization
 		{
 			return Session::get('language');
 		}
+        // or get cookie language...
+        else if($this->configRepository->get('laravel-localization::useCookieLanguage') &&
+            Cookie::get('language') != null &&
+            in_array(Cookie::get('language'), $languages))
+        {
+            return Cookie::get('language');
+        }
 		// or get browser language...
-		else if($this->configRepository->get('laravel-localization::useBrowserLanguage') &&
-					isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) &&
-					in_array(substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2), $languages))
+		else if($this->configRepository->get('laravel-localization::useBrowserLanguage'))
 		{
-			return substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
+			return $this->negotiateLanguage();
 		}
+
 		// or get application default language
-		else
-		{
-			return $this->configRepository->get('app.locale');
-		}
+		return $this->configRepository->get('app.locale');
 	}
 
 	/**
 	 * Returns translated routes
-     *
 	 * @return array translated routes
 	 */
 	public function getTranslatedRoutes()
@@ -406,9 +392,7 @@ class LaravelLocalization
 
 	/**
 	 * Translate routes and save them to the translated routes array (used in the localize route filter)
-     *
 	 * @param  string $routeName key of the translated string
-     *
 	 * @return string            translated string
 	 */
 	public function transRoute($routeName)
@@ -419,9 +403,7 @@ class LaravelLocalization
 
 	/**
 	 * Returns the translation key for a given path
-     *
 	 * @param  string $path [description]
-     *
 	 * @return string       [description]
 	 */
 	public function getRouteNameFromAPath($path)
@@ -442,6 +424,97 @@ class LaravelLocalization
 	    }
 	    return false;
 	}
+
+    /**
+     * Negotiates language with the user's browser through the Accept-Language
+     * HTTP header or the user's host address.  Language codes are generally in
+     * the form "ll" for a language spoken in only one country, or "ll-CC" for a
+     * language spoken in a particular country.  For example, U.S. English is
+     * "en-US", while British English is "en-UK".  Portugese as spoken in
+     * Portugal is "pt-PT", while Brazilian Portugese is "pt-BR".
+     *
+     * This function is based on negotiateLanguage from Pear HTTP2
+     * http://pear.php.net/package/HTTP2/
+     *
+     * Quality factors in the Accept-Language: header are supported, e.g.:
+     *      Accept-Language: en-UK;q=0.7, en-US;q=0.6, no, dk;q=0.8
+     *
+     * @return string  The negotiated language result or app.locale.
+     */
+    public function negotiateLanguage()
+    {
+        $default = $this->configRepository->get('app.locale');
+        $supported = array();
+        foreach ($this->configRepository->get('laravel-localization::languagesAllowed') as $lang) {
+            $supported[strtolower($lang)] = $lang;
+        }
+
+        if (!count($supported)) {
+            return $default;
+        }
+
+        if (Request::header('Accept-Language')) {
+            $matches = array();
+            $generic_matches = array();
+            foreach (explode(',', Request::header('Accept-Language')) as $option) {
+                $option = array_map('trim', explode(';', $option));
+
+                $l = strtolower($option[0]);
+                if (isset($option[1])) {
+                    $q = (float) str_replace('q=', '', $option[1]);
+                } else {
+                    $q = null;
+                    // Assign default low weight for generic values
+                    if ($l == '*/*') {
+                        $q = 0.01;
+                    } elseif (substr($l, -1) == '*') {
+                        $q = 0.02;
+                    }
+                }
+                // Unweighted values, get high weight by their position in the
+                // list
+                $q = isset($q) ? $q : 1000 - count($matches);
+                $matches[$l] = $q;
+
+                //If for some reason the Accept-Language header only sends language with country
+                //we should make the language without country an accepted option, with a value
+                //less than it's parent.
+                $l_ops = explode('-', $l);
+                array_pop($l_ops);
+                while (!empty($l_ops)) {
+                    //The new generic option needs to be slightly less important than it's base
+                    $q -= 0.001;
+                    $op = implode('-', $l_ops);
+                    if (empty($generic_matches[$op]) || $generic_matches[$op] > $q) {
+                        $generic_matches[$op] = $q;
+                    }
+                    array_pop($l_ops);
+                }
+            }
+            $matches = array_merge($generic_matches, $matches);
+
+            arsort($matches, SORT_NUMERIC);
+
+            foreach ($matches as $key => $q) {
+                if (isset($supported[$key])) {
+                    return $supported[$key];
+                }
+            }
+            // If any (i.e. "*") is acceptable, return the first supported format
+            if (isset($matches['*'])) {
+                return array_shift($supported);
+            }
+        }
+
+        if (Request::server('REMOTE_HOST')) {
+            $lang = strtolower(end($h = explode('.', Request::server('REMOTE_HOST'))));
+            if (isset($supported[$lang])) {
+                return $supported[$lang];
+            }
+        }
+
+        return $default;
+    }
 
 }
 
