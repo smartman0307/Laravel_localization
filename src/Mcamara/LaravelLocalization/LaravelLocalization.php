@@ -73,6 +73,8 @@ class LaravelLocalization
 
 	/**
 	 * Creates new instance.
+     *
+     * @throws UnsupportedLocaleException
 	 *
 	 * @param \Illuminate\Config\Repository $configRepository
 	 * @param \Illuminate\View\Environment $view
@@ -86,7 +88,10 @@ class LaravelLocalization
 
 		// set default locale
 		$this->defaultLocale = Config::get('app.locale');
-		$this->getSupportedLocales();
+        $supportedLocales = $this->getSupportedLocales();
+        if (empty($supportedLocales[$this->defaultLocale])) {
+            throw new UnsupportedLocaleException("Laravel's default locale is not in the supportedLocales array.");
+        }
 	}
 
 	/**
@@ -168,8 +173,6 @@ class LaravelLocalization
 	 * @param  string $customView 		Which template should the language bar have?
 	 *
 	 * @return string 					Returns an html view with a language bar
-     *
-     * @deprecated will be removed in v1.0 please see updated readme for details on making your own language bar tempalte.
 	 */
 	public function getLanguageBar($abbr = false, $customView = 'mcamara/laravel-localization/languagebar')
 	{
