@@ -73,6 +73,8 @@ class LaravelLocalization
 
 	/**
 	 * Creates new instance.
+     *
+     * @throws UnsupportedLocaleException
 	 *
 	 * @param \Illuminate\Config\Repository $configRepository
 	 * @param \Illuminate\View\Environment $view
@@ -86,7 +88,10 @@ class LaravelLocalization
 
 		// set default locale
 		$this->defaultLocale = Config::get('app.locale');
-		$this->getSupportedLocales();
+        $supportedLocales = $this->getSupportedLocales();
+        if (empty($supportedLocales[$this->defaultLocale])) {
+            throw new UnsupportedLocaleException("Laravel's default locale is not in the supportedLocales array.");
+        }
 	}
 
 	/**
@@ -168,6 +173,8 @@ class LaravelLocalization
 	 * @param  string $customView 		Which template should the language bar have?
 	 *
 	 * @return string 					Returns an html view with a language bar
+     *
+     * @deprecated will be removed in v1.0 please see updated readme for details on making your own language bar tempalte.
 	 */
 	public function getLanguageBar($abbr = false, $customView = 'mcamara/laravel-localization/languagebar')
 	{
@@ -283,6 +290,7 @@ class LaravelLocalization
 			}
 		}
 
+        $base_path = Request::getBaseUrl();
 		$parsed_url = parse_url($url);
 		if (empty($parsed_url['path']))
 		{
@@ -290,6 +298,7 @@ class LaravelLocalization
 		}
 		else
 		{
+            $parsed_url['path'] = str_replace($base_path, '', '/'.ltrim($parsed_url['path'], '/'));
 			$path = $parsed_url['path'];
 			foreach ($this->getSupportedLocales() as $localeCode => $lang)
 			{
@@ -306,6 +315,7 @@ class LaravelLocalization
 		{
 			$parsed_url['path'] = $locale . '/' . ltrim($parsed_url['path'], '/');
 		}
+        $parsed_url['path'] = ltrim($base_path, '/') . '/' . $parsed_url['path'];
 		//Make sure that the pass path is returned with a leading slash only if it come in with one.
 		if (starts_with($path, '/') === true) {
 			$parsed_url['path'] = '/' . $parsed_url['path'];
