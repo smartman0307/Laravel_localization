@@ -386,7 +386,7 @@ class LaravelLocalization
 		$route = "";
 		if (!($locale === $this->defaultLocale && $this->hideDefaultLocaleInURL()))
 		{
-			$route = '/'.$locale;
+			$route = $locale;
 		}
 		
 		foreach ($transKeysNames as $transKeyName)
@@ -767,19 +767,16 @@ class LaravelLocalization
 		}
 		$path = str_replace('/' . $this->currentLocale . '/', '', $path);
 		$path = trim($path,"/");
-		$path = explode("/",$path);
 		$routesNames = array();
 
-		foreach ($path as $path_route)
-		{
-			foreach ($this->translatedRoutes as $route)
-			{
-				if ($this->translator->trans($route) == $path_route)
-				{
-					$routesNames[] = $route;
-				}
-			}
-		}
+
+        foreach ($this->translatedRoutes as $route)
+        {
+            if ($this->translator->trans($route) == $path)
+            {
+                $routesNames[] = $route;
+            }
+        }
 
 		return $routesNames;
 	}
