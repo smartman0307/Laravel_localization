@@ -65,7 +65,7 @@ class LanguageNegotiator {
         {
             reset($this->supportedLanguages);
 
-            return key($this->supportedLanguages);
+            return key($array);
         }
 
         if ( class_exists('Locale') && !empty( $_SERVER[ 'HTTP_ACCEPT_LANGUAGE' ] ) )
