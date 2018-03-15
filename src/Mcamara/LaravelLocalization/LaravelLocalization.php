@@ -443,7 +443,6 @@ class LaravelLocalization
 
         switch ($this->getCurrentLocaleScript()) {
             // Other (historic) RTL scripts exist, but this list contains the only ones in current use.
-	    case 'Farsi':	
             case 'Arab':
             case 'Hebr':
             case 'Mong':
@@ -486,7 +485,7 @@ class LaravelLocalization
             return $this->currentLocale;
         }
 
-        if ($this->useAcceptLanguageHeader()) {
+        if ($this->useAcceptLanguageHeader() && !$this->app->runningInConsole()) {
             $negotiator = new LanguageNegotiator($this->defaultLocale, $this->getSupportedLocales(), $this->request);
 
             return $negotiator->negotiateLanguage();
